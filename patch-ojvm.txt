@@ -1,0 +1,43 @@
+$ORACLE_HOME/OPatch/ocm/bin/emocmrsp -no_banner -output /home/oracle/psu-206/ocm3.rsp
+$ORACLE_HOME/OPatch/opatch apply -ocmrf /home/oracle/psu-206/ocm3.rsp
+# Patch OJVM
+$ORACLE_HOME/OPatch/opatch lsinventory
+cd <PATCH_TOP_DIR>/29610422
+$ORACLE_HOME/OPatch/opatch prereq CheckConflictAgainstOHWithDetail -ph ./
+shutdown immediate
+lsnrctl stop
+$ORACLE_HOME/OPatch/opatch apply
+$ORACLE_HOME/OPatch/opatch lsinventory
+
+$ORACLE_HOME/OPatch/opatch lspatches
+
+------------------------------------------------------------------------------------
+#Loading Modified SQL Files Into the Database ( One node )
+cd $ORACLE_HOME/sqlpatch/29610422
+sqlplus /nolog
+SQL> CONNECT / AS SYSDBA
+SQL> startup upgrade
+SQL> @postinstall.sql
+SQL> shutdown
+SQL> startup
+cd $ORACLE_HOME/rdbms/admin
+SQL> @utlrp.sql
+------------------------------------------------------------------------------------
+#Loading Modified SQL Files Into the Database (RAC, dataguard: làm duy nhất trên 1 node RAC), Make sure no other instance of the database is up on the remote nodes
+cd $ORACLE_HOME/sqlpatch/29610422
+sqlplus /nolog
+SQL> CONNECT / AS SYSDBA
+SQL> STARTUP
+SQL> alter system set cluster_database=false scope=spfile;
+SQL> SHUTDOWN immediate
+SQL> STARTUP UPGRADE
+SQL> @postinstall.sql
+SQL> alter system set cluster_database=true scope=spfile;
+SQL> SHUTDOWN immediate
+SQL> STARTUP
+cd $ORACLE_HOME/rdbms/admin
+SQL> @utlrp.sql
+------------------------------------------------------------------------------------
+# Checking invalid object:
+select count(*) from dba_objects where status != 'VALID';
+select count(*) from dba_objects where owner in ('SYS','SYSTEM') and status != 'VALID';
